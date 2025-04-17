@@ -43,13 +43,13 @@ class FrameLayer:
 
         header = sock.recv(FrameLayer.HEADER_SIZE)
         if not header:
-            raise ConnectionError("Connection failed.")
+            return None
 
         length = struct(FrameLayer.HEADER_FMT, header)[0]
         buf = b""
         while len(buf) < length:
             chunk = sock.recv(length - len(buf))
             if not chunk:
-                raise ConnectionError("Connection not handled")
+                return None
             buf += chunk
         return buf
