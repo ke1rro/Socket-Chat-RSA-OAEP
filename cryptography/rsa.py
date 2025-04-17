@@ -94,7 +94,7 @@ class RSAKeyPair:
         Returns:
             tuple[int, int]: The module and exponent
         """
-        return self.n, self.e
+        return self.n, self.exponent
 
     def get_block_length(self, n) -> int:
         """
@@ -160,7 +160,7 @@ class RSAKeyPair:
         seed = secrets.token_bytes(hash_len)
 
         # Apply MFG1 to get fast part P_1 (P_1 = M ⊕ G(r))
-        db_mask = self.mgf1(seed, len(db), hashlib.sha3_256)
+        db_mask = self.mgf1(seed, len(db), hashlib.sha256)
         masked_db = bytes(a ^ b for a, b in zip(db, db_mask))
 
         # Apply MFG1 to get the second part P_2 (P_2 = r ⊕ H(P_1))
