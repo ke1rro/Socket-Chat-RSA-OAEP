@@ -190,8 +190,8 @@ class RSAKeyPair:
             raise ValueError("Invalid padding: first byte not zero")
 
         # Split parts
-        masked_seed = padded_data[1:hash_len+1]
-        masked_db = padded_data[hash_len+1:]
+        masked_seed = padded_data[1 : hash_len + 1]
+        masked_db = padded_data[hash_len + 1 :]
 
         # Recover r using H(maskedDB)
         seed_mask = self.mgf1(masked_db, hash_len, hashlib.sha256)
@@ -221,7 +221,7 @@ class RSAKeyPair:
             raise ValueError("Message separator not found")
 
         # Return the message after the separator
-        return db[separator_idx + 1:]
+        return db[separator_idx + 1 :]
 
     def encrypt(self, data: bytes, pubkey: tuple[int, int] = None) -> bytes:
         """
@@ -239,14 +239,14 @@ class RSAKeyPair:
         encrypted = []
 
         for i in range(0, len(data), block_size):
-            chunk = data[i:i+block_size]
+            chunk = data[i : i + block_size]
             padded = self.oaep_pad(chunk)
-            chunk_int = int.from_bytes(padded, 'big')
+            chunk_int = int.from_bytes(padded, "big")
             cipher_int = pow(chunk_int, e, n)
-            cipher_block = cipher_int.to_bytes((n.bit_length() + 7) // 8, 'big')
+            cipher_block = cipher_int.to_bytes((n.bit_length() + 7) // 8, "big")
             encrypted.append(cipher_block)
 
-        return b''.join(encrypted)
+        return b"".join(encrypted)
 
     def decrypt(self, data: bytes) -> bytes:
         """
@@ -262,10 +262,10 @@ class RSAKeyPair:
         decrypted = []
 
         for i in range(0, len(data), block_size):
-            chunk = data[i:i+block_size]
-            chunk_int = int.from_bytes(chunk, 'big')
+            chunk = data[i : i + block_size]
+            chunk_int = int.from_bytes(chunk, "big")
             plain_int = pow(chunk_int, self.d, self.n)
-            plain_block = plain_int.to_bytes(block_size, 'big')
+            plain_block = plain_int.to_bytes(block_size, "big")
             decrypted.append(self.oaep_unpad(plain_block))
 
-        return b''.join(decrypted)
+        return b"".join(decrypted)
