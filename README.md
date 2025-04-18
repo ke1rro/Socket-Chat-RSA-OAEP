@@ -8,7 +8,7 @@
 
 ## Work Allocation
 
-- Nazar - Miller–Rabin primality test, RSA
+- Nazar Mykhailischuk - Miller–Rabin primality test, RSA
 - Nikita Lenyk - chat structure, OAEP, RSA
 
 
