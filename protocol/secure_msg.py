@@ -3,6 +3,7 @@ Secure Message protocol
 """
 
 import hashlib
+import hmac
 
 
 class SecureMessage:
@@ -41,7 +42,7 @@ class SecureMessage:
         dlen = int.from_bytes(raw[:4], "big")
         digest = raw[4 : 4 + dlen]
         payload = raw[4 + dlen :]
-        if hashlib.sha256(payload).digest() != digest:
+        if not hmac.compare_digest(hashlib.sha256(payload).digest(), digest):
             raise ValueError("Integrity test not passed")
         msg = cls(payload)
         msg.digest = digest
