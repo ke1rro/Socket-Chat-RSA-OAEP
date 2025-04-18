@@ -5,13 +5,13 @@ Module to handle RSA key
 import hashlib
 import secrets
 
-from miller_rabin import MillerRabin
+from .miller_rabin import MillerRabin
 
 
 class RSAKeyPair:
     """
     Module for exchanging key pairs:
-    Private and Public keys
+    Private and Public keys.
 
 
     Attributes:
@@ -36,13 +36,13 @@ class RSAKeyPair:
 
     def __gen_prime(self, bits: int) -> int:
         """
-        Generates the prime number using Miller-Rabin prime test
+        Generates the prime number using Miller-Rabin prime test.
 
         Args:
-            bits (int): The length of the number to generate
+            bits (int): The length of the number to generate.
 
         Returns:
-            int: The prime number of the given bits
+            int: The prime number of the given bits.
         """
         while True:
             candidate = self.__gen_candidate(bits)
@@ -56,25 +56,26 @@ class RSAKeyPair:
         Ensures it is fixed length and not even.
 
         Args:
-            bits (int): The length of the number to generate
+            bits (int): The length of the number to generate.
 
         Returns:
-            int: The odd number of the fixed length
+            int: The odd number of the fixed length.
         """
         return (1 << (bits - 1)) | secrets.randbits(bits - 1) | 1
 
     def __gen_prime_factors(
         self, bits: int, min_factor_delta=256, attempts=100000
     ) -> tuple[int, int]:
-        """_summary_
+        """
+        Function to wrap prime numbers generation
 
         Args:
-            bits (int): _description_
-            min_factor_delta (int, optional): _description_. Defaults to 256.
-            attempts (int, optional): _description_. Defaults to 100000.
+            bits (int): the length of the number
+            min_factor_delta (int, optional): minimum distance between number, works as security layer. Defaults to 256.
+            attempts (int, optional): number of attempts to generate the prime number pair. Defaults to 100000.
 
         Returns:
-            tuple[int, int]: _description_
+            tuple[int, int]: Tuple with two prime number with min distance of 256
         """
         for _ in range(attempts):
             p = self.__gen_prime(bits // 2)
@@ -84,7 +85,8 @@ class RSAKeyPair:
 
             if abs(p - q).bit_length() >= min_factor_delta:
                 return p, q
-        return f"Couldn't generate a prime factors in {attempts} attempts"
+
+        print(f"Couldn't generate prime factors in {attempts} attempts")
 
     @property
     def public_key(self) -> tuple[int, int]:
@@ -112,7 +114,10 @@ class RSAKeyPair:
 
     @staticmethod
     def mgf1(seed: bytes, length: int, hash_func=hashlib.sha1) -> bytes:
-        """Mask generation function took from Wiki https://en.wikipedia.org/wiki/Mask_generation_function"""
+        """
+        Mask generation function took
+        from Wiki https://en.wikipedia.org/wiki/Mask_generation_function
+        """
 
         hLen = hash_func().digest_size
         # https://www.ietf.org/rfc/rfc2437.txt
@@ -159,15 +164,15 @@ class RSAKeyPair:
         # Generate random seed r
         seed = secrets.token_bytes(hash_len)
 
-        # Apply MFG1 to get fast part P_1 (P_1 = M ⊕ G(r))
+        # Apply MFG1 to get fast part P_1 (P_1 = M xor G(r))
         db_mask = self.mgf1(seed, len(db), hashlib.sha256)
         masked_db = bytes(a ^ b for a, b in zip(db, db_mask))
 
-        # Apply MFG1 to get the second part P_2 (P_2 = r ⊕ H(P_1))
+        # Apply MFG1 to get the second part P_2 (P_2 = r xor H(P_1))
         seed_mask = self.mgf1(masked_db, hash_len, hashlib.sha256)
         masked_seed = bytes(a ^ b for a, b in zip(seed, seed_mask))
 
-        # Concatenate everyting (EM = 0x00 || maskedSeed || maskedDB)
+        # Concatenate everyting (EM = 0x00 + maskedSeed + maskedDB)
         return b"\x00" + masked_seed + masked_db
 
     def oaep_unpad(self, padded_data: bytes, label: bytes = b"") -> bytes:
@@ -184,10 +189,10 @@ class RSAKeyPair:
         hash_len = hashlib.sha256().digest_size
 
         if len(padded_data) < 2 * hash_len + 2:
-            raise ValueError("Invalid padding: data too short")
+            raise ValueError("The data too short")
 
         if padded_data[0] != 0:
-            raise ValueError("Invalid padding: first byte not zero")
+            raise ValueError("Didn't find the first separator")
 
         # Split parts
         masked_seed = padded_data[1 : hash_len + 1]
@@ -206,7 +211,7 @@ class RSAKeyPair:
 
         # Check if label hash matches
         if not db.startswith(lhash):
-            raise ValueError("Invalid padding: label hash mismatch")
+            raise ValueError("Hash mismatch")
 
         # Find the 0x01 separator
         separator_idx = hash_len
@@ -214,11 +219,11 @@ class RSAKeyPair:
             if db[separator_idx] == 1:
                 break
             if db[separator_idx] != 0:
-                raise ValueError("Invalid padding format")
+                raise ValueError("Invalid padding")
             separator_idx += 1
 
         if separator_idx >= len(db) - 1:
-            raise ValueError("Message separator not found")
+            raise ValueError("Separator not found")
 
         # Return the message after the separator
         return db[separator_idx + 1 :]

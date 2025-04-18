@@ -5,10 +5,10 @@ Chat server module
 import socket
 import threading
 
-from connection import Connection
-
 from cryptography.rsa import RSAKeyPair
 from protocol.secure_msg import SecureMessage
+
+from .connection import Connection
 
 
 class ChatServer:
@@ -20,9 +20,11 @@ class ChatServer:
     address: int
 
     def __init__(self, host: str = "127.0.0.1", address: int = 10000):
-        self.address = address
+        self.address = (host, address)
         self.rsa: RSAKeyPair = RSAKeyPair()
         self.clients: dict[Connection, str] = {}
+        self.running = True
+        self.sessions = []
 
     def start(self) -> None:
         """
@@ -37,12 +39,19 @@ class ChatServer:
         sock.listen()
         print(f"Server is working on {self.address}")
 
-        while True:
-            client_sock, _ = sock.accept()
-            conn = Connection(client_sock, rsa=None, pubkey=None)
-            threading.Thread(
-                target=self.handle_connection, args=(conn,), deamon=True
-            ).start()
+        while self.running:
+            try:
+                client_sock, _ = sock.accept()
+                conn = Connection(client_sock)
+                thread = threading.Thread(
+                    target=self.handle_connection, args=(conn,), daemon=True
+                )
+                self.sessions.append(thread)
+                thread.start()
+            except (KeyboardInterrupt, OSError):
+                self.running = False
+                self.soft_shutdown()
+        sock.close()
 
     def handle_handshake(self, conn: Connection) -> None:
         """
@@ -51,12 +60,11 @@ class ChatServer:
         Args:
             conn (Connection): The client connection object.
         """
-        # client handshake
         raw = conn.sock.recv(4096).decode()
         n, e = map(int, raw.split(","))
-        conn.remote_pubkey = (n, e)
-        sn, se = self.rsa.pubcli_key()
-        conn.sock.sendall(f"{sn}, {se}".encode())
+        conn.pub_key = (n, e)
+        sn, se = self.rsa.public_key
+        conn.sock.sendall(f"{sn},{se}".encode())
         conn.rsa = self.rsa
 
     def handle_connection(self, conn: Connection) -> None:
@@ -67,25 +75,44 @@ class ChatServer:
         Args:
             conn (Connection): The new user's connection object
         """
-        self.handle_handshake(conn)
-
-        # username
-        msg = conn.recv_decrypted()
-        username = msg.payload.decode()
-        self.clients[conn] = username
-        self.broadcast(f"{username} entered the chatroom.")
-        print(f"{username} connected.")
-
+        username = None
         try:
-            while True:
-                msg = conn.recv_decrypted()
-                text = msg.payload.decode()
-                print(f"{username}: {text}")
-                self.broadcast(f"{username}: {text}")
-        except ConnectionError:
-            print(f"{username} disconnected")
-            del self.clients[conn]
-            self.broadcast(f"{username} has left the chat.")
+            self.handle_handshake(conn)
+
+            msg = conn.recv_decrypted()
+            username = msg.payload.decode()
+            self.clients[conn] = username
+            self.broadcast(f"{username} entered the chatroom.")
+            print(f"{username} connected.")
+
+            while self.running:
+                try:
+                    conn.sock.settimeout(1.0)
+                    msg = conn.recv_decrypted()
+                    text = msg.payload.decode()
+                    print(f"{username}: {text}")
+                    self.broadcast(f"{username}: {text}")
+                except socket.timeout:
+                    continue
+                except ConnectionError:
+                    break
+                except Exception as e:
+                    print(f"Error handling message: {e}")
+                    break
+
+        except Exception as e:
+            pass
+
+        finally:
+            if username and conn in self.clients:
+                print(f"{username} disconnected")
+                self.broadcast(f"{username} has left the chat.")
+                del self.clients[conn]
+
+            try:
+                conn.close()
+            except:
+                pass
 
     def broadcast(self, text: str) -> None:
         """
@@ -95,8 +122,27 @@ class ChatServer:
             text (str): The message to sent to chat.
         """
         msg = SecureMessage(text.encode())
-        for conn, user in list(self.clients.items()):
+        for conn, _ in list(self.clients.items()):
             try:
                 conn.send_encrypted(msg)
             except Exception:
                 pass
+
+    def soft_shutdown(self):
+        """
+        Closes all active sessions
+        """
+
+        for conn in self.clients.keys():
+            try:
+                conn.close()
+            except:
+                pass
+
+        for thread in self.sessions:
+            try:
+                thread.join()
+            except:
+                pass
+
+        print("All sessions closed")

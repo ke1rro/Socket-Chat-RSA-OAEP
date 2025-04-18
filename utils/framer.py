@@ -9,7 +9,7 @@ import struct
 class FrameLayer:
     """
     Class to handle headers logic for the message
-    help to compute the exact size, so you
+    help to compute the exact size, of the message.
     """
 
     HEADER_FMT = "!I"
@@ -21,10 +21,10 @@ class FrameLayer:
         Redifine the payload by adding a 4-byte prefix (message header).
 
         Args:
-            payload (bytes): The message data to frame
+            payload (bytes): The message data to frame.
 
         Returns:
-            bytes: Framed message consisting of 4-byte length header and payload
+            bytes: Framed message consisting of 4-byte length header and payload.
         """
         return struct.pack(FrameLayer.HEADER_FMT, len(payload)) + payload
 
@@ -38,18 +38,18 @@ class FrameLayer:
             sock (socket.socket): A connected socket (user) to read from.
 
         Returns:
-            bytes: The raw payload
+            bytes: The raw payload.
         """
 
         header = sock.recv(FrameLayer.HEADER_SIZE)
         if not header:
-            return None
+            raise ConnectionError("Connection failed")
 
-        length = struct(FrameLayer.HEADER_FMT, header)[0]
-        buf = b""
-        while len(buf) < length:
-            chunk = sock.recv(length - len(buf))
+        length = struct.unpack(FrameLayer.HEADER_FMT, header)[0]
+        temp_buf = b""
+        while len(temp_buf) < length:
+            chunk = sock.recv(length - len(temp_buf))
             if not chunk:
-                return None
-            buf += chunk
-        return buf
+                raise ConnectionError("Conn closed")
+            temp_buf += chunk
+        return temp_buf
