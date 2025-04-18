@@ -191,5 +191,5 @@ RSA
 
 - https://legacy.cryptool.org/en/cto/rsa-visual
 
-PKSC
+PKCS
 - https://www.rfc-editor.org/rfc/rfc8017#section-9.2
